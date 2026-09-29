@@ -1,0 +1,15 @@
+Assessment Part 1
+Develop an API Endpoint
+1. Create an IAM role named coupons_lambda_role in localstack.
+2. The permissions assigned to the coupons_lambda_role role that will be associated
+with the lambda functions in the API should allow access to the following services
+Cloudwatch: Conditional to log groups prefixed with “/aws/lambda/coupons*”
+3. A Lambda function named coupons_list is registered in localstack.
+4. The lambda function should be able to receive a sample event from API Gateway
+and return a sample response in JSON format, showing a message:
+{ "message": "Coupons API is working successfully" }
+5. The API is updated with the new endpoint available when GET requests are made to
+“/coupons_poc”.
+6. A Unit Test is created to confirm that the function works as expected.
+7. A Newman test is created in the coupons_newman.json collection to confirm that
+the API endpoint works as expected.

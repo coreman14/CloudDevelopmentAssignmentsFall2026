@@ -1,0 +1,102 @@
+lstk start
+
+export AWS_REGION=us-east-1
+export AWS_ACCESS_KEY_ID=test
+export AWS_SECRET_ACCESS_KEY=test
+
+# Part 1: Coupons API Lambda and API Gateway setup.
+aws iam create-role \
+	--role-name coupons_lambda_role \
+	--assume-role-policy-document file://Part1/part1_trust_policy.json \
+	--endpoint-url http://localhost:4566 \
+	--region us-east-1
+
+aws iam put-role-policy \
+	--role-name coupons_lambda_role \
+	--policy-name coupons_cloudwatch_logs \
+	--policy-document file://Part1/part1_cloudwatch_policy.json \
+	--endpoint-url http://localhost:4566 \
+	--region us-east-1
+
+aws lambda create-function \
+	--function-name coupons_list \
+	--runtime python3.12 \
+	--handler coupons_list.lambda_handler \
+	--role arn:aws:iam::000000000000:role/coupons_lambda_role \
+	--zip-file fileb://Part1/coupons_list.zip \
+	--endpoint-url http://localhost:4566 \
+	--region us-east-1
+
+aws lambda invoke \
+	--function-name coupons_list \
+	--payload '{"httpMethod":"GET","path":"/coupons_poc"}' \
+	--cli-binary-format raw-in-base64-out \
+	Part1/part1_lambda_response.json \
+	--endpoint-url http://localhost:4566 \
+	--region us-east-1
+
+API_ID=$(aws apigateway create-rest-api \
+	--name coupons_api \
+	--query id \
+	--output text \
+	--endpoint-url http://localhost:4566 \
+	--region us-east-1)
+
+ROOT_RESOURCE_ID=$(aws apigateway get-resources \
+	--rest-api-id "$API_ID" \
+	--query "items[?path=='/'].id | [0]" \
+	--output text \
+	--endpoint-url http://localhost:4566 \
+	--region us-east-1)
+
+RESOURCE_ID=$(aws apigateway create-resource \
+	--rest-api-id "$API_ID" \
+	--parent-id "$ROOT_RESOURCE_ID" \
+	--path-part coupons_poc \
+	--query id \
+	--output text \
+	--endpoint-url http://localhost:4566 \
+	--region us-east-1)
+
+aws apigateway put-method \
+	--rest-api-id "$API_ID" \
+	--resource-id "$RESOURCE_ID" \
+	--http-method GET \
+	--authorization-type NONE \
+	--endpoint-url http://localhost:4566 \
+	--region us-east-1
+
+aws apigateway put-integration \
+	--rest-api-id "$API_ID" \
+	--resource-id "$RESOURCE_ID" \
+	--http-method GET \
+	--type AWS_PROXY \
+	--integration-http-method POST \
+	--uri arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:000000000000:function:coupons_list/invocations \
+	--endpoint-url http://localhost:4566 \
+	--region us-east-1
+
+aws apigateway test-invoke-method \
+	--rest-api-id "$API_ID" \
+	--resource-id "$RESOURCE_ID" \
+	--http-method GET \
+	--endpoint-url http://localhost:4566 \
+	--region us-east-1
+
+aws lambda add-permission \
+	--function-name coupons_list \
+	--statement-id apigateway-coupons-list \
+	--action lambda:InvokeFunction \
+	--principal apigateway.amazonaws.com \
+	--source-arn "arn:aws:execute-api:us-east-1:000000000000:${API_ID}/*/GET/coupons_poc" \
+	--endpoint-url http://localhost:4566 \
+	--region us-east-1
+
+aws apigateway create-deployment \
+	--rest-api-id "$API_ID" \
+	--stage-name local \
+	--endpoint-url http://localhost:4566 \
+	--region us-east-1
+
+newman run Part1/coupons_newman.json --env-var "api_name=$API_ID"
+

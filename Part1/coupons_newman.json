@@ -1,0 +1,34 @@
+{
+  "info": {
+    "name": "Part 1 - Coupons API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "GET /coupons_poc",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/coupons_poc"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('returns HTTP 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('returns the success message', function () { pm.expect(pm.response.json().message).to.eql('Coupons API is working successfully'); });"
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:4566/restapis/{{api_name}}/local/_user_request_",
+      "type": "string"
+    }
+  ]
+}
