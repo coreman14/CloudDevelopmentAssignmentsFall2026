@@ -1,0 +1,26 @@
+Assessment Part 2
+Integrate Data Storage
+1. A DynamoDB table named coupons is registered in localstack.
+The DynamoDB table should be configured to support the following requirements:
+• Perform 50 eventually consistent reads per second
+• Perform 10 eventually consistent writes per second
+• The average item size is 1 Kilobyte.
+2. The lambda function coupons_get_by_id is updated to retrieve the coupons from
+the database given their id. The coupon id will be passed in from the API Gateway as
+a path parameter.
+3. The coupons_get_by_id lambda function will receive an event from the API
+Gateway that contains the coupon id in the form of a path parameter named id and
+return the coupon matching the identifier.
+4. The lambda function named coupons_update is updated to update coupons in the
+database given their id. The coupon id will be passed in from the API Gateway as a
+path parameter named id. The DynamoDB table is updated with a new index that
+allows for performant queries using the fields provider_id and campaign_id.
+Submission:
+1. Write down all the commands into a txt file and name it as “Command.txt”
+2. Push your project folder into GitHub, including all your project files and output.
+3. Make a recording of running your project and show the outcome.
+4. Submit the video into D2L dropbox and past your GitHub link into comment.
+
+Classification: General
+
+

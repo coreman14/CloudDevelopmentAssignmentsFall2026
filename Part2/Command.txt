@@ -1,0 +1,188 @@
+lstk start
+
+export AWS_REGION=us-east-1
+export AWS_ACCESS_KEY_ID=test
+export AWS_SECRET_ACCESS_KEY=test
+
+# Part 2: provision DynamoDB storage, deploy the coupon Lambdas, and expose
+# GET /coupons/{id} and PUT /coupons/{id} through API Gateway.
+
+aws iam create-role \
+  --role-name coupons_lambda_role \
+  --assume-role-policy-document file://Part2/part2_trust_policy.json \
+  --endpoint-url http://localhost:4566 \
+  --region us-east-1
+
+aws iam put-role-policy \
+  --role-name coupons_lambda_role \
+  --policy-name coupons_dynamodb_logs \
+  --policy-document file://Part2/part2_cloudwatch_dynamodb_policy.json \
+  --endpoint-url http://localhost:4566 \
+  --region us-east-1
+
+aws dynamodb create-table \
+  --table-name coupons \
+  --attribute-definitions \
+    AttributeName=id,AttributeType=S \
+    AttributeName=provider_id,AttributeType=S \
+    AttributeName=campaign_id,AttributeType=S \
+  --key-schema AttributeName=id,KeyType=HASH \
+  --provisioned-throughput ReadCapacityUnits=25,WriteCapacityUnits=10 \
+  --global-secondary-indexes file://Part2/part2_global_secondary_indexes.json \
+  --endpoint-url http://localhost:4566 \
+  --region us-east-1
+
+aws dynamodb wait table-exists \
+  --table-name coupons \
+  --endpoint-url http://localhost:4566 \
+  --region us-east-1
+
+# At 1 KB per item, 25 provisioned RCUs support 50 eventually consistent
+# reads/second; 10 provisioned WCUs support 10 writes/second.
+# The index supports queries by provider_id and campaign_id.
+aws dynamodb put-item \
+  --table-name coupons \
+  --item file://Part2/sample_coupon.json \
+  --endpoint-url http://localhost:4566 \
+  --region us-east-1
+
+# Package each Lambda handler in the archive root.
+cd Part2
+zip -j coupons_get_by_id.zip coupons_get_by_id.py
+zip -j coupons_update.zip coupons_update.py
+cd ..
+
+aws lambda create-function \
+  --function-name coupons_get_by_id \
+  --runtime python3.12 \
+  --handler coupons_get_by_id.lambda_handler \
+  --role arn:aws:iam::000000000000:role/coupons_lambda_role \
+  --zip-file fileb://Part2/coupons_get_by_id.zip \
+  --environment 'Variables={DYNAMODB_TABLE=coupons,DYNAMODB_ENDPOINT_URL=http://localhost.localstack.cloud:4566}' \
+  --endpoint-url http://localhost:4566 \
+  --region us-east-1
+
+aws lambda create-function \
+  --function-name coupons_update \
+  --runtime python3.12 \
+  --handler coupons_update.lambda_handler \
+  --role arn:aws:iam::000000000000:role/coupons_lambda_role \
+  --zip-file fileb://Part2/coupons_update.zip \
+  --environment 'Variables={DYNAMODB_TABLE=coupons,DYNAMODB_ENDPOINT_URL=http://localhost.localstack.cloud:4566}' \
+  --endpoint-url http://localhost:4566 \
+  --region us-east-1
+
+# Directly invoke both Lambdas to verify their API Gateway proxy event shapes.
+aws lambda invoke \
+  --function-name coupons_get_by_id \
+  --payload '{"pathParameters":{"id":"coupon-123"}}' \
+  --cli-binary-format raw-in-base64-out \
+  Part2/part2_get_response.json \
+  --endpoint-url http://localhost:4566 \
+  --region us-east-1
+
+aws lambda invoke \
+  --function-name coupons_update \
+  --payload '{"pathParameters":{"id":"coupon-123"},"body":"{\"description\":\"Updated fall offer\"}"}' \
+  --cli-binary-format raw-in-base64-out \
+  Part2/part2_update_response.json \
+  --endpoint-url http://localhost:4566 \
+  --region us-east-1
+
+API_ID=$(aws apigateway create-rest-api \
+  --name coupons_api \
+  --query id \
+  --output text \
+  --endpoint-url http://localhost:4566 \
+  --region us-east-1)
+
+ROOT_RESOURCE_ID=$(aws apigateway get-resources \
+  --rest-api-id "$API_ID" \
+  --query "items[?path=='/'].id | [0]" \
+  --output text \
+  --endpoint-url http://localhost:4566 \
+  --region us-east-1)
+
+COUPONS_RESOURCE_ID=$(aws apigateway create-resource \
+  --rest-api-id "$API_ID" \
+  --parent-id "$ROOT_RESOURCE_ID" \
+  --path-part coupons \
+  --query id \
+  --output text \
+  --endpoint-url http://localhost:4566 \
+  --region us-east-1)
+
+COUPON_ID_RESOURCE_ID=$(aws apigateway create-resource \
+  --rest-api-id "$API_ID" \
+  --parent-id "$COUPONS_RESOURCE_ID" \
+  --path-part '{id}' \
+  --query id \
+  --output text \
+  --endpoint-url http://localhost:4566 \
+  --region us-east-1)
+
+for METHOD in GET PUT; do
+  aws apigateway put-method \
+    --rest-api-id "$API_ID" \
+    --resource-id "$COUPON_ID_RESOURCE_ID" \
+    --http-method "$METHOD" \
+    --authorization-type NONE \
+    --endpoint-url http://localhost:4566 \
+    --region us-east-1
+done
+
+aws apigateway put-integration \
+  --rest-api-id "$API_ID" \
+  --resource-id "$COUPON_ID_RESOURCE_ID" \
+  --http-method GET \
+  --type AWS_PROXY \
+  --integration-http-method POST \
+  --uri arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:000000000000:function:coupons_get_by_id/invocations \
+  --endpoint-url http://localhost:4566 \
+  --region us-east-1
+
+aws apigateway put-integration \
+  --rest-api-id "$API_ID" \
+  --resource-id "$COUPON_ID_RESOURCE_ID" \
+  --http-method PUT \
+  --type AWS_PROXY \
+  --integration-http-method POST \
+  --uri arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:000000000000:function:coupons_update/invocations \
+  --endpoint-url http://localhost:4566 \
+  --region us-east-1
+
+aws lambda add-permission \
+  --function-name coupons_get_by_id \
+  --statement-id apigateway-coupons-get-by-id \
+  --action lambda:InvokeFunction \
+  --principal apigateway.amazonaws.com \
+  --source-arn "arn:aws:execute-api:us-east-1:000000000000:${API_ID}/*/GET/coupons/*" \
+  --endpoint-url http://localhost:4566 \
+  --region us-east-1
+
+aws lambda add-permission \
+  --function-name coupons_update \
+  --statement-id apigateway-coupons-update \
+  --action lambda:InvokeFunction \
+  --principal apigateway.amazonaws.com \
+  --source-arn "arn:aws:execute-api:us-east-1:000000000000:${API_ID}/*/PUT/coupons/*" \
+  --endpoint-url http://localhost:4566 \
+  --region us-east-1
+
+aws apigateway create-deployment \
+  --rest-api-id "$API_ID" \
+  --stage-name local \
+  --endpoint-url http://localhost:4566 \
+  --region us-east-1
+
+# Test the deployed endpoints, including the API path parameter:
+curl "http://localhost:4566/restapis/${API_ID}/local/_user_request_/coupons/coupon-123"
+curl -X PUT \
+  "http://localhost:4566/restapis/${API_ID}/local/_user_request_/coupons/coupon-123" \
+  -H 'Content-Type: application/json' \
+  -d '{"description":"Updated through the API"}'
+
+newman run Part2/coupons_newman.json --env-var "api_id=$API_ID"
+
+# Unit tests:
+python3 -m unittest Part2/part2_unit_test.py

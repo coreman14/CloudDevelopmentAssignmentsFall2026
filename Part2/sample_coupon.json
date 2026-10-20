@@ -1,0 +1,17 @@
+{
+  "id": {
+    "S": "coupon-123"
+  },
+  "provider_id": {
+    "S": "provider-1"
+  },
+  "campaign_id": {
+    "S": "campaign-2026-fall"
+  },
+  "name": {
+    "S": "Fall savings"
+  },
+  "description": {
+    "S": "Save on select products this fall."
+  }
+}

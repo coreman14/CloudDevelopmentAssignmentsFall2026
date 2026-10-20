@@ -1,0 +1,68 @@
+{
+  "info": {
+    "name": "Part 2 - Coupons Data Storage",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "GET /coupons/:id",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/coupons/{{couponId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('returns HTTP 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('returns the requested coupon', function () { pm.expect(pm.response.json().id).to.eql(pm.variables.get('couponId')); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "PUT /coupons/:id",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"description\":\"Newman updated this coupon\"}"
+        },
+        "url": "{{baseUrl}}/coupons/{{couponId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('returns HTTP 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('returns the updated coupon', function () { pm.expect(pm.response.json().description).to.eql('Newman updated this coupon'); });"
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:4566/restapis/{{api_id}}/local/_user_request_",
+      "type": "string"
+    },
+    {
+      "key": "couponId",
+      "value": "coupon-123",
+      "type": "string"
+    }
+  ]
+}

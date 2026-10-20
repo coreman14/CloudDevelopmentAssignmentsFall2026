@@ -1,0 +1,1 @@
+{"statusCode": 200, "headers": {"Content-Type": "application/json"}, "body": "{\"campaign_id\": \"campaign-2026-fall\", \"description\": \"Updated fall offer\", \"id\": \"coupon-123\", \"name\": \"Fall savings\", \"provider_id\": \"provider-1\"}"}
