@@ -1,0 +1,30 @@
+Assessment Part 3
+Secure the Application Program Interface
+1. Create the coupons_get_token function to handle the logic to verify user
+credentials and generate the JWT.
+2. The coupons_get_token lambda function will receive an event from the API
+Gateway and generate a response with the token and expiration time
+3. The endpoint /token that exposes the lambda function coupons_get_token will
+return a 403 code when the username or password provided are invalid
+4. The token will be encrypted with the following secret: 0HXc4w5NEzA61HkV
+5. The table named users should be used.
+6. The encryption library used was bcrypt and the salt used 12 rounds
+7. The endpoint /coupons/to_secure that exposes the lambda function
+coupons_to_secure will return a 403 code when token validation fail
+Submission:
+1. Write down all the commands into a txt file and name it as “Command.txt”
+2. Push your project folder into GitHub, including all your project files and output.
+3. Make a recording of running your project and show the outcome.
+4. Submit the video into D2L dropbox and past your GitHub link into comment.
+
+Classification: General
+
+Extra: 2 users must be added to the Db
+
+username: tester1
+password plain text: Pc4RM0AMKy5aSGfD
+username: tester2
+password plain text: 4LWs6xnc1t32BzXA
+
+
+

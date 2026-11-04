@@ -1,0 +1,8 @@
+{
+  "username": {
+    "S": "tester2"
+  },
+  "password_hash": {
+    "S": "$2b$12$nvjOVWz2FKQhw9mIOIHwxe5bR40PUqbQQTb8j04UmuuVzAZMs.nce"
+  }
+}

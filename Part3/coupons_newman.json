@@ -1,0 +1,120 @@
+{
+  "info": {
+    "name": "Part 3 - Secure Coupons API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "POST /token - valid credentials",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"username\":\"tester1\",\"password\":\"Pc4RM0AMKy5aSGfD\"}"
+        },
+        "url": "{{baseUrl}}/token"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('valid credentials return HTTP 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('response includes token and expiration', function () { const body = pm.response.json(); pm.expect(body.token).to.be.a('string'); pm.expect(body.expires_at).to.be.a('number'); pm.collectionVariables.set('token', body.token); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "POST /token - invalid credentials",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"username\":\"tester1\",\"password\":\"incorrect-password\"}"
+        },
+        "url": "{{baseUrl}}/token"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('invalid credentials return HTTP 403', function () { pm.response.to.have.status(403); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "GET /coupons/to_secure - valid token",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": "{{baseUrl}}/coupons/to_secure"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('valid token returns HTTP 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('protected response identifies the authenticated user', function () { pm.expect(pm.response.json().username).to.eql('tester1'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "GET /coupons/to_secure - missing token",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/coupons/to_secure"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('missing token returns HTTP 403', function () { pm.response.to.have.status(403); });"
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:4566/restapis/{{api_id}}/local/_user_request_",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}

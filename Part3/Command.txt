@@ -1,0 +1,174 @@
+lstk start
+
+export AWS_REGION=us-east-1
+export AWS_ACCESS_KEY_ID=test
+export AWS_SECRET_ACCESS_KEY=test
+export JWT_SECRET='0HXc4w5NEzA61HkV'
+
+
+aws dynamodb create-table \
+  --table-name users \
+  --attribute-definitions AttributeName=username,AttributeType=S \
+  --key-schema AttributeName=username,KeyType=HASH \
+  --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5 \
+  --endpoint-url http://localhost:4566 \
+  --region us-east-1
+
+aws dynamodb wait table-exists \
+  --table-name users \
+  --endpoint-url http://localhost:4566 \
+  --region us-east-1
+
+aws dynamodb put-item \
+  --table-name users \
+  --item file://Part3/users_tester1.json \
+  --endpoint-url http://localhost:4566 \
+  --region us-east-1
+
+aws dynamodb put-item \
+  --table-name users \
+  --item file://Part3/users_tester2.json \
+  --endpoint-url http://localhost:4566 \
+  --region us-east-1
+
+aws iam put-role-policy \
+  --role-name coupons_lambda_role \
+  --policy-name coupons_users_read \
+  --policy-document file://Part3/part3_users_policy.json \
+  --endpoint-url http://localhost:4566 \
+  --region us-east-1
+
+PROJECT_DIR=$(pwd)
+python3 -m pip install --target /tmp/part3-lambda-package -r Part3/requirements.txt
+mkdir -p /tmp/part3-lambda-package/Part3
+cp Part3/__init__.py Part3/auth_utils.py \
+  Part3/coupons_get_token.py Part3/coupons_to_secure.py \
+  /tmp/part3-lambda-package/Part3/
+rm -f Part3/coupons_lambda.zip
+(cd /tmp/part3-lambda-package && \
+  zip -r "$PROJECT_DIR/Part3/coupons_lambda.zip" . \
+    -x '*/__pycache__/*' '*/__pycache__' '*.pyc')
+
+aws lambda create-function \
+  --function-name coupons_get_token \
+  --runtime python3.12 \
+  --handler Part3.coupons_get_token.lambda_handler \
+  --role arn:aws:iam::000000000000:role/coupons_lambda_role \
+  --zip-file fileb://Part3/coupons_lambda.zip \
+  --environment "Variables={DYNAMODB_USERS_TABLE=users,DYNAMODB_ENDPOINT_URL=http://localhost.localstack.cloud:4566,JWT_SECRET=${JWT_SECRET},JWT_EXPIRATION_SECONDS=3600}" \
+  --endpoint-url http://localhost:4566 \
+  --region us-east-1
+
+aws lambda create-function \
+  --function-name coupons_to_secure \
+  --runtime python3.12 \
+  --handler Part3.coupons_to_secure.lambda_handler \
+  --role arn:aws:iam::000000000000:role/coupons_lambda_role \
+  --zip-file fileb://Part3/coupons_lambda.zip \
+  --environment "Variables={JWT_SECRET=${JWT_SECRET}}" \
+  --endpoint-url http://localhost:4566 \
+  --region us-east-1
+
+ROOT_RESOURCE_ID=$(aws apigateway get-resources \
+  --rest-api-id "$API_ID" \
+  --query "items[?path=='/'].id | [0]" \
+  --output text \
+  --endpoint-url http://localhost:4566 \
+  --region us-east-1)
+
+TOKEN_RESOURCE_ID=$(aws apigateway create-resource \
+  --rest-api-id "$API_ID" \
+  --parent-id "$ROOT_RESOURCE_ID" \
+  --path-part token \
+  --query id \
+  --output text \
+  --endpoint-url http://localhost:4566 \
+  --region us-east-1)
+
+COUPONS_RESOURCE_ID=$(aws apigateway get-resources \
+  --rest-api-id "$API_ID" \
+  --query "items[?path=='/coupons'].id | [0]" \
+  --output text \
+  --endpoint-url http://localhost:4566 \
+  --region us-east-1)
+
+TO_SECURE_RESOURCE_ID=$(aws apigateway create-resource \
+  --rest-api-id "$API_ID" \
+  --parent-id "$COUPONS_RESOURCE_ID" \
+  --path-part to_secure \
+  --query id \
+  --output text \
+  --endpoint-url http://localhost:4566 \
+  --region us-east-1)
+
+aws apigateway put-method \
+  --rest-api-id "$API_ID" \
+  --resource-id "$TOKEN_RESOURCE_ID" \
+  --http-method POST \
+  --authorization-type NONE \
+  --endpoint-url http://localhost:4566 \
+  --region us-east-1
+
+aws apigateway put-integration \
+  --rest-api-id "$API_ID" \
+  --resource-id "$TOKEN_RESOURCE_ID" \
+  --http-method POST \
+  --type AWS_PROXY \
+  --integration-http-method POST \
+  --uri arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:000000000000:function:coupons_get_token/invocations \
+  --endpoint-url http://localhost:4566 \
+  --region us-east-1
+
+aws lambda add-permission \
+  --function-name coupons_get_token \
+  --statement-id apigateway-coupons-get-token \
+  --action lambda:InvokeFunction \
+  --principal apigateway.amazonaws.com \
+  --source-arn "arn:aws:execute-api:us-east-1:000000000000:${API_ID}/*/POST/token" \
+  --endpoint-url http://localhost:4566 \
+  --region us-east-1
+
+aws apigateway put-method \
+  --rest-api-id "$API_ID" \
+  --resource-id "$TO_SECURE_RESOURCE_ID" \
+  --http-method GET \
+  --authorization-type NONE \
+  --endpoint-url http://localhost:4566 \
+  --region us-east-1
+
+aws apigateway put-integration \
+  --rest-api-id "$API_ID" \
+  --resource-id "$TO_SECURE_RESOURCE_ID" \
+  --http-method GET \
+  --type AWS_PROXY \
+  --integration-http-method POST \
+  --uri arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:000000000000:function:coupons_to_secure/invocations \
+  --endpoint-url http://localhost:4566 \
+  --region us-east-1
+
+aws lambda add-permission \
+  --function-name coupons_to_secure \
+  --statement-id apigateway-coupons-to-secure \
+  --action lambda:InvokeFunction \
+  --principal apigateway.amazonaws.com \
+  --source-arn "arn:aws:execute-api:us-east-1:000000000000:${API_ID}/*/GET/coupons/to_secure" \
+  --endpoint-url http://localhost:4566 \
+  --region us-east-1
+
+aws apigateway create-deployment \
+  --rest-api-id "$API_ID" \
+  --stage-name local \
+  --endpoint-url http://localhost:4566 \
+  --region us-east-1
+
+aws lambda invoke \
+  --function-name coupons_get_token \
+  --payload '{"body":"{\"username\":\"tester1\",\"password\":\"Pc4RM0AMKy5aSGfD\"}"}' \
+  --cli-binary-format raw-in-base64-out \
+  Part3/part3_token_response.json \
+  --endpoint-url http://localhost:4566 \
+  --region us-east-1
+
+newman run Part3/coupons_newman.json --env-var "api_id=$API_ID"
+
+PYTHONPATH=/tmp/part3-lambda-package python3 -m unittest Part3/part3_unit_test.py
