@@ -1,0 +1,16 @@
+[
+  {
+    "id": "coupon-201",
+    "provider_id": "provider-1",
+    "campaign_id": "campaign-2026-fall",
+    "name": "Fall savings",
+    "description": "Save 15% on select products this fall."
+  },
+  {
+    "id": "coupon-202",
+    "provider_id": "provider-2",
+    "campaign_id": "campaign-2026-holiday",
+    "name": "Holiday bundle",
+    "description": "Buy two, get one free on holiday bundles."
+  }
+]

@@ -1,0 +1,68 @@
+{
+  "info": {
+    "name": "Part 4 - Coupons File Import",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "GET /coupons/import_presigned_url",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/coupons/import_presigned_url"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('presigned URL request returns HTTP 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('response is a PUT URL for coupon.json in the coupons bucket', function () { const body = pm.response.json(); pm.expect(body.method).to.eql('PUT'); pm.expect(body.bucket).to.eql('coupons'); pm.expect(body.key).to.eql('coupon.json'); pm.expect(body.upload_url).to.include('/coupons/coupon.json'); pm.expect(body.upload_url).to.include('X-Amz-Signature='); pm.collectionVariables.set('upload_url', body.upload_url); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "PUT coupon.json to presigned URL",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "[\n  {\n    \"id\": \"coupon-201\",\n    \"provider_id\": \"provider-1\",\n    \"campaign_id\": \"campaign-2026-fall\",\n    \"name\": \"Fall savings\",\n    \"description\": \"Save 15% on select products this fall.\"\n  },\n  {\n    \"id\": \"coupon-202\",\n    \"provider_id\": \"provider-2\",\n    \"campaign_id\": \"campaign-2026-holiday\",\n    \"name\": \"Holiday bundle\",\n    \"description\": \"Buy two, get one free on holiday bundles.\"\n  }\n]\n"
+        },
+        "url": "{{upload_url}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('upload with presigned URL returns HTTP 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('S3 returns an ETag for the uploaded object', function () { pm.expect(pm.response.headers.get('ETag')).to.be.a('string'); });"
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:4566/restapis/{{api_id}}/local/_user_request_",
+      "type": "string"
+    },
+    {
+      "key": "upload_url",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}
